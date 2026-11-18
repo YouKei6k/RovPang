@@ -1,0 +1,11 @@
+# 팀원 2 제공 : /rovpang/place
+# Goal
+bool use_default                    # true면 정해진 하역대 위치에 내려놓음
+geometry_msgs/PointStamped target   # use_default가 false일 때만 사용
+---
+# Result
+bool success
+string reason
+---
+# Feedback
+string stage
