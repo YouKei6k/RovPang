@@ -1,0 +1,30 @@
+# ROS2 build
+build/
+install/
+log/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+
+# Secrets
+.env
+.env.*
+!.env.example
+token.txt
+*secret*.json
+
+# Editor
+.vscode/
+
+# Large recordings
+*.bag
+*.db3
+*.mcap
+*.mp4
