@@ -236,6 +236,7 @@ class MissionManager(Node):
     # ---------- 전체 흐름 ----------
     def run_mission(self, req):
         left_start = False
+        delivered = False
         try:
             self.set_state(S.STATE_DETECTING, '', '물품 {} 탐색'.format(req.item_class))
             self.set_arm(SetArmPose.Request.POSE_LOOK)
@@ -270,6 +271,7 @@ class MissionManager(Node):
             result = self.call_action(self.place_client, goal, 'place')
             if not result.success:
                 raise MissionFailed('PLACE_FAILED', result.reason)
+            delivered = True   # 하역까지 끝나면 이후 문제는 '배송 완료'로 기록
 
             self.set_state(S.STATE_RETURNING, '', '출발지로 복귀')
             self.set_arm(SetArmPose.Request.POSE_HOME)
@@ -282,7 +284,12 @@ class MissionManager(Node):
 
             self.set_state(S.STATE_DONE, '', '배송 완료')
         except MissionFailed as e:
-            if e.code == 'CANCELED':
+            if delivered:
+                # 하역은 끝났으므로 배송 자체는 성공. 복귀 중 문제만 오류 코드로 남김
+                code = 'RETURN_CANCELED' if e.code == 'CANCELED' else e.code
+                self.set_state(S.STATE_DONE, code, '배송 완료, 복귀 중 문제: ' + e.message)
+                self.try_return_home()
+            elif e.code == 'CANCELED':
                 self.set_state(S.STATE_CANCELED, e.code, e.message)
             else:
                 self.set_state(S.STATE_FAILED, e.code, e.message)

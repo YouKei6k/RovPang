@@ -4,6 +4,7 @@
   ros2 launch rovpang_mission mock_test.launch.py fail_on:=pick
   ros2 launch rovpang_mission mock_test.launch.py wrong_sign:=true
   ros2 launch rovpang_mission mock_test.launch.py wrong_qr:=true
+  ros2 launch rovpang_mission mock_test.launch.py delay:=10.0   # 취소 시험용으로 동작을 느리게
 """
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
@@ -15,13 +16,15 @@ def generate_launch_description():
     fail_on = LaunchConfiguration('fail_on')
     wrong_sign = LaunchConfiguration('wrong_sign')
     wrong_qr = LaunchConfiguration('wrong_qr')
+    delay = LaunchConfiguration('delay')
     return LaunchDescription([
         DeclareLaunchArgument('fail_on', default_value='',
                               description='pick / place / go_to / arm 중 하나를 실패시키기'),
         DeclareLaunchArgument('wrong_sign', default_value='false'),
         DeclareLaunchArgument('wrong_qr', default_value='false'),
+        DeclareLaunchArgument('delay', default_value='2.0', description='가짜 로봇 동작 시간(초)'),
         Node(package='rovpang_mission', executable='mock_robot', name='mock_robot',
-             output='screen', parameters=[{'fail_on': fail_on, 'delay': 2.0}]),
+             output='screen', parameters=[{'fail_on': fail_on, 'delay': delay}]),
         Node(package='rovpang_mission', executable='mock_vision', name='mock_vision',
              output='screen', parameters=[{'wrong_sign': wrong_sign, 'wrong_qr': wrong_qr}]),
         Node(package='rovpang_mission', executable='mission_manager', name='mission_manager',
