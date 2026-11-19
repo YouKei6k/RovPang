@@ -1,0 +1,12 @@
+# 팀원 2 제공 : /rovpang/pick  (호출: 팀원 1 미션 관리 노드)
+# Goal
+geometry_msgs/PointStamped target   # 물품 위치. frame_id는 카메라 좌표계여도 됨(팀원 2가 TF로 변환)
+string item_class
+---
+# Result
+bool success
+string reason                       # 실패 사유, 성공 시 ""
+int32 attempts
+---
+# Feedback
+string stage                        # "APPROACH", "GRASP", "LIFT" 등

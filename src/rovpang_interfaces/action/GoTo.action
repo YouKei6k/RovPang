@@ -1,0 +1,14 @@
+# 팀원 2 제공 : /rovpang/go_to  (내부에서 Nav2 navigate_to_pose 호출)
+string DEST_START="START"
+string DEST_A="A"
+string DEST_B="B"
+
+# Goal
+string destination
+---
+# Result
+bool success
+string reason
+---
+# Feedback
+float32 distance_remaining          # m

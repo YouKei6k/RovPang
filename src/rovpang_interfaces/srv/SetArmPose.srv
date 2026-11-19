@@ -1,0 +1,9 @@
+# 팀원 2 제공 : /rovpang/set_arm_pose
+string POSE_HOME="HOME"
+string POSE_CARRY="CARRY"  # 물품을 든 채 주행하는 자세
+string POSE_LOOK="LOOK"    # 표지판·QR·물품을 보는 자세
+
+string pose
+---
+bool success
+string message
