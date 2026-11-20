@@ -56,6 +56,18 @@ PC처럼 이 메시지가 없는 환경에서는 소리 없이 안내 문장만 
 | 이동 중 취소 | delay:=10.0 | CANCELED, 출발지 복귀 성공 |
 | 복귀 중 취소 | delay:=10.0 | DONE / RETURN_CANCELED (하역까지 끝났으므로 배송 성공으로 기록) |
 
+### 가짜 노드 시험 결과 (2026-11-20, qr-retry-alert 브랜치)
+
+| 시험 | 실행 옵션 | 결과 |
+| --- | --- | --- |
+| 단위 시험 | colcon test | 11개 통과 (recipient_auth 5, alerts 6) |
+| 첫 QR만 틀림 | wrong_qr_for:=3.0 | QR 불일치 1/2회 안내 → 약 2초 뒤 두 번째 QR로 인증 → DONE |
+| QR 2번 모두 틀림 | wrong_qr:=true | FAILED / QR_INVALID (2/2회), 하역 안 함, CARRY 자세로 바꾼 뒤 출발지 복귀 성공 |
+| 복귀 전 멈춤 | wrong_qr:=true fail_on:=arm_away | CARRY 실패 → 주행 안 함, 새 요청 NEED_RETURN 거절, 고장 해결 후 return_home → IDLE → 새 요청 정상 접수 |
+| 부저 연결 | ros2 topic info /ros_robot_controller/set_buzzer | BuzzerState(freq, on_time, off_time, repeat), 구독 1 (ros_robot_controller 실행 중) |
+
+wrong_qr_for:=1.0은 팔 LOOK 전환(약 0.5초)과 표지판 5장 수집(약 1초)이 끝나기 전에 틀린 QR이 끝나 두 번째 기회가 시험되지 않았다. 3.0 이상으로 시험한다.
+
 ## 3. 팀원 2 기능과 연동할 때 주의할 점
 
 mock_robot 자리에 실제 노드가 들어갈 때 아래를 지켜야 지금 시험 결과가 그대로 유지된다.
@@ -98,8 +110,8 @@ ros2 topic echo /rovpang/alert                             # 창 2 (예외 안�
 ros2 run rovpang_manager send_request --dest A --item buds # 창 3
 ros2 service call /rovpang/cancel std_srvs/srv/Trigger     # 취소
 ```
-delay, wrong_qr_for 값은 10.0, 1.0처럼 소수점을 붙여야 한다.
+delay, wrong_qr_for 값은 10.0, 3.0처럼 소수점을 붙여야 한다.
 - `wrong_qr:=true`: QR 2번 모두 틀림 → FAILED / QR_INVALID, CARRY 자세로 복귀
-- `wrong_qr_for:=1.0`: 첫 QR만 틀림 → 다시 보여 주세요 안내 후 두 번째에 성공 → DONE
+- `wrong_qr_for:=3.0`: 첫 QR만 틀림 → 다시 보여 주세요 안내 후 두 번째에 성공 → DONE
 - `wrong_qr:=true fail_on:=arm_away`: QR 실패 → 배송지에서 CARRY 자세 실패 → 멈춤(복귀 필요). 이 상태에서 새 요청은 거절된다.
   `ros2 param set /mock_robot fail_on none`(고장 해결) → `ros2 service call /rovpang/return_home std_srvs/srv/Trigger` → 복귀 후 IDLE

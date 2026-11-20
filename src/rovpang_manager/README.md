@@ -20,7 +20,7 @@ ros2 topic echo /rovpang/status                            # 창 2
 ros2 run rovpang_manager send_request --dest A --item buds # 창 3
 ros2 service call /rovpang/cancel std_srvs/srv/Trigger     # 취소 시험
 ```
-실패 시험: `fail_on:=pick` / `fail_on:=go_to` / `wrong_sign:=true` / `wrong_qr:=true` (QR 2번 모두 틀림) / `wrong_qr_for:=1.0` (첫 QR만 틀림)
+실패 시험: `fail_on:=pick` / `fail_on:=go_to` / `wrong_sign:=true` / `wrong_qr:=true` (QR 2번 모두 틀림) / `wrong_qr_for:=3.0` (첫 QR만 틀림)
 
 QR은 2번 기회(qr_attempts), 모두 틀리면 CARRY 자세로 물품을 가지고 복귀. 예외 시 `/rovpang/alert` 발행과 부저 비프음(use_buzzer, 음성 없음).
 
