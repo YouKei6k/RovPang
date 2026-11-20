@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """시험용 배송 요청 보내기 (관리자 프로그램 대신)
 
-  ros2 run rovpang_mission send_request --dest A --item buds
+  ros2 run rovpang_manager send_request --dest A --item buds
 """
 import argparse
 import secrets

@@ -1,10 +1,10 @@
-"""가짜 로봇 + 가짜 비전 + 미션 관리 노드를 한 번에 실행 (로봇은 움직이지 않음).
+"""가짜 로봇 + 가짜 비전 + 배송 작업 관리 노드(task_manager)를 한 번에 실행 (로봇은 움직이지 않음).
 
-  ros2 launch rovpang_mission mock_test.launch.py
-  ros2 launch rovpang_mission mock_test.launch.py fail_on:=pick
-  ros2 launch rovpang_mission mock_test.launch.py wrong_sign:=true
-  ros2 launch rovpang_mission mock_test.launch.py wrong_qr:=true
-  ros2 launch rovpang_mission mock_test.launch.py delay:=10.0   # 취소 시험용으로 동작을 느리게
+  ros2 launch rovpang_manager mock_test.launch.py
+  ros2 launch rovpang_manager mock_test.launch.py fail_on:=pick
+  ros2 launch rovpang_manager mock_test.launch.py wrong_sign:=true
+  ros2 launch rovpang_manager mock_test.launch.py wrong_qr:=true
+  ros2 launch rovpang_manager mock_test.launch.py delay:=10.0   # 취소 시험용으로 동작을 느리게
 """
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
@@ -23,10 +23,10 @@ def generate_launch_description():
         DeclareLaunchArgument('wrong_sign', default_value='false'),
         DeclareLaunchArgument('wrong_qr', default_value='false'),
         DeclareLaunchArgument('delay', default_value='2.0', description='가짜 로봇 동작 시간(초)'),
-        Node(package='rovpang_mission', executable='mock_robot', name='mock_robot',
+        Node(package='rovpang_manager', executable='mock_robot', name='mock_robot',
              output='screen', parameters=[{'fail_on': fail_on, 'delay': delay}]),
-        Node(package='rovpang_mission', executable='mock_vision', name='mock_vision',
+        Node(package='rovpang_manager', executable='mock_vision', name='mock_vision',
              output='screen', parameters=[{'wrong_sign': wrong_sign, 'wrong_qr': wrong_qr}]),
-        Node(package='rovpang_mission', executable='mission_manager', name='mission_manager',
+        Node(package='rovpang_manager', executable='task_manager', name='task_manager',
              output='screen'),
     ])

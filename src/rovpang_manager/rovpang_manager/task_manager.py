@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""RovPang 미션 관리 노드 (F-14 배송 상태 관리) - 골격 버전
+"""RovPang 배송 작업 관리 노드 task_manager (F-14 배송 상태 관리)
 
 배송 요청(/rovpang/delivery_request)을 받으면 아래 순서로 팀원 2의 액션·서비스를 호출한다.
 
   DETECTING : 팔 LOOK 자세 -> /rovpang/detections 에서 요청 물품 찾기
   PICKING   : /rovpang/pick
   MOVING    : 팔 CARRY 자세 -> /rovpang/go_to (목적지)
-  VERIFYING : 팔 LOOK 자세 -> /rovpang/sign 다수결로 목적지 확인 -> /rovpang/qr 토큰 확인
+  VERIFYING : 팔 LOOK 자세 -> /rovpang/sign 다수결로 목적지 확인 -> /rovpang/qr 토큰 확인(recipient_auth)
   PLACING   : /rovpang/place
   RETURNING : 팔 HOME 자세 -> /rovpang/go_to START
   DONE
@@ -33,6 +33,8 @@ from rovpang_interfaces.action import GoTo, Pick, Place
 from rovpang_interfaces.msg import DeliveryRequest, DeliveryStatus, DetectionArray, Sign
 from rovpang_interfaces.srv import SetArmPose
 
+from rovpang_manager.recipient_auth import RecipientAuth
+
 S = DeliveryStatus
 
 
@@ -43,9 +45,9 @@ class MissionFailed(Exception):
         self.message = message
 
 
-class MissionManager(Node):
+class TaskManager(Node):
     def __init__(self):
-        super().__init__('mission_manager')
+        super().__init__('task_manager')
         # 파라미터 (값은 초안, 요구사항 정의서와 맞춤)
         self.declare_parameter('confidence_min', 0.8)
         self.declare_parameter('detect_timeout', 10.0)
@@ -75,7 +77,7 @@ class MissionManager(Node):
         self.request = None
         self.cancel_event = threading.Event()
         self.active_goal = None
-        self.used_tokens = set()
+        self.auth = RecipientAuth()   # F-10 수령자 인증
 
         self.last_detections = None
         self.sign_buffer = None      # 수집 중일 때만 list
@@ -89,7 +91,7 @@ class MissionManager(Node):
                 csv.writer(f).writerow(['time', 'delivery_id', 'state', 'error_code', 'message'])
 
         self.set_state(S.STATE_IDLE, '', '대기 중')
-        self.get_logger().info('미션 관리 노드 시작 (로그: {})'.format(self.log_path))
+        self.get_logger().info('배송 작업 관리 노드 시작 (로그: {})'.format(self.log_path))
 
     # ---------- 상태 발행·기록 ----------
     def set_state(self, state, error_code='', message=''):
@@ -116,6 +118,7 @@ class MissionManager(Node):
                 self.get_logger().warn('알 수 없는 목적지: {}'.format(req.destination))
                 return
             self.request = req
+            self.auth.register(req.delivery_id, req.qr_token)
             self.cancel_event.clear()
         threading.Thread(target=self.run_mission, args=(req,), daemon=True).start()
 
@@ -218,18 +221,17 @@ class MissionManager(Node):
                                 '요청 {} / 인식 {} ({}/{})'.format(destination, label, count, need))
         return label
 
-    def verify_qr(self, token):
+    def verify_qr(self, delivery_id):
         t_start = time.time()
         while time.time() - t_start < self.get_parameter('qr_timeout').value:
             self.check_cancel()
             if self.last_qr is not None and self.last_qr[1] >= t_start:
-                data = self.last_qr[0]
-                if data in self.used_tokens:
-                    raise MissionFailed('QR_REUSED', '이미 사용한 QR')
-                if data != token:
-                    raise MissionFailed('QR_INVALID', '다른 배송의 QR')
-                self.used_tokens.add(data)
-                return
+                ok, code = self.auth.verify(delivery_id, self.last_qr[0])
+                if ok:
+                    return
+                messages = {'QR_INVALID': '다른 배송의 QR', 'QR_REUSED': '이미 사용한 QR',
+                            'NOT_REGISTERED': '등록되지 않은 배송'}
+                raise MissionFailed(code, messages.get(code, code))
             time.sleep(0.1)
         raise MissionFailed('QR_TIMEOUT', 'QR 인식 시간 초과')
 
@@ -263,7 +265,7 @@ class MissionManager(Node):
             self.set_state(S.STATE_VERIFYING, '', '표지판·QR 확인')
             self.set_arm(SetArmPose.Request.POSE_LOOK)
             self.verify_sign(req.destination)
-            self.verify_qr(req.qr_token)
+            self.verify_qr(req.delivery_id)
 
             self.set_state(S.STATE_PLACING, '', '하역')
             goal = Place.Goal()
@@ -313,7 +315,7 @@ class MissionManager(Node):
 
 def main():
     rclpy.init()
-    node = MissionManager()
+    node = TaskManager()
     executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(node)
     try:
