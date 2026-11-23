@@ -20,6 +20,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+		'arm_controller = rovpang_arm.arm_controller:main',
+		'arm_test = rovpang_arm.arm_test:main',
+		'gripper_control = rovpang_arm.gripper_control:main',
         ],
     },
 )
