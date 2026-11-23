@@ -6,6 +6,7 @@ delay 초 뒤에 성공을 돌려준다. fail_on 파라미터로 특정 기능�
   fail_on: '' (모두 성공) / 'pick' / 'place' / 'go_to' / 'arm'
            / 'arm_away' (출발지가 아닌 곳에서만 팔 자세 실패 -> 복귀 전 멈춤 시험)
   실행 중에 ros2 param set /mock_robot fail_on none 으로 고장을 '고칠' 수 있다.
+  pick_fail_times: 처음 N번의 pick만 실패 (1이면 첫 집기 실패 -> 재시도 성공 시험)
 """
 import time
 
@@ -24,6 +25,8 @@ class MockRobot(Node):
         super().__init__('mock_robot')
         self.declare_parameter('delay', 2.0)
         self.declare_parameter('fail_on', '')
+        self.declare_parameter('pick_fail_times', 0)
+        self.pick_count = 0
         self.location = GoTo.Goal.DEST_START   # 가짜 로봇의 현재 위치
         cb = ReentrantCallbackGroup()
         common = dict(callback_group=cb,
@@ -62,7 +65,8 @@ class MockRobot(Node):
             result.success, result.reason = False, 'canceled'
             return result
         result.attempts = 1
-        if self.should_fail('pick'):
+        self.pick_count += 1
+        if self.should_fail('pick') or self.pick_count <= self.get_parameter('pick_fail_times').value:
             result.success, result.reason = False, 'mock: 그리퍼 파지 실패'
             goal_handle.abort()
         else:

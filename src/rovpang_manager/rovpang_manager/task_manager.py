@@ -4,7 +4,7 @@
 배송 요청(/rovpang/delivery_request)을 받으면 아래 순서로 팀원 2의 액션·서비스를 호출한다.
 
   DETECTING : 팔 LOOK 자세 -> /rovpang/detections 에서 요청 물품 찾기
-  PICKING   : /rovpang/pick
+  PICKING   : /rovpang/pick (실패하면 LOOK 자세로 물품을 다시 찾아 새 위치로 다시 요청, pick_attempts 번까지)
   MOVING    : 팔 CARRY 자세 -> /rovpang/go_to (목적지)
   VERIFYING : 팔 LOOK 자세 -> /rovpang/sign 다수결로 목적지 확인 -> /rovpang/qr 토큰 확인(recipient_auth)
   PLACING   : /rovpang/place
@@ -74,6 +74,7 @@ class TaskManager(Node):
         self.declare_parameter('use_buzzer', True)
         self.declare_parameter('buzzer_freq', 2000)
         self.declare_parameter('action_timeout', 60.0)
+        self.declare_parameter('pick_attempts', 2)       # 집기 시도 횟수 (첫 시도 + 재시도 1회)
         self.declare_parameter('log_dir', os.path.expanduser('~/rovpang_logs'))
 
         cb = ReentrantCallbackGroup()
@@ -324,23 +325,35 @@ class TaskManager(Node):
             time.sleep(0.1)
         raise MissionFailed('QR_TIMEOUT', 'QR 인식 시간 초과 ({}/{}회 시도)'.format(tried, attempts))
 
+    def detect_and_pick(self, item_class):
+        """물품 탐지 -> 집기. 집기에 실패하면 LOOK 자세로 물품을 다시 찾아(밀렸을 수 있으므로)
+        새 위치로 다시 요청한다. 재시도는 이 노드에서만 한다 (pick 액션은 한 번만 시도)."""
+        attempts = max(1, int(self.get_parameter('pick_attempts').value))
+        for n in range(1, attempts + 1):
+            self.set_state(S.STATE_DETECTING, '', '물품 {} 탐색 ({}/{}회)'.format(item_class, n, attempts))
+            self.set_arm(SetArmPose.Request.POSE_LOOK)
+            self.last_detections = None   # 자세를 바꾼 뒤 새로 들어온 탐지만 사용
+            target, conf = self.detect_item(item_class)
+
+            self.set_state(S.STATE_PICKING, '', '신뢰도 {:.2f}, 위치 ({:.2f}, {:.2f}, {:.2f}) ({}/{}회)'.format(
+                conf, target.point.x, target.point.y, target.point.z, n, attempts))
+            goal = Pick.Goal()
+            goal.target = target
+            goal.item_class = item_class
+            result = self.call_action(self.pick_client, goal, 'pick')
+            if result.success:
+                return
+            if n >= attempts:
+                raise MissionFailed('PICK_FAILED', '{} ({}/{}회 실패)'.format(result.reason, n, attempts))
+            self.get_logger().warn('집기 실패 {}/{}회: {} -> 물품을 다시 찾아 재시도'.format(
+                n, attempts, result.reason))
+
     # ---------- 전체 흐름 ----------
     def run_mission(self, req):
         left_start = False
         delivered = False
         try:
-            self.set_state(S.STATE_DETECTING, '', '물품 {} 탐색'.format(req.item_class))
-            self.set_arm(SetArmPose.Request.POSE_LOOK)
-            target, conf = self.detect_item(req.item_class)
-
-            self.set_state(S.STATE_PICKING, '', '신뢰도 {:.2f}, 위치 ({:.2f}, {:.2f}, {:.2f})'.format(
-                conf, target.point.x, target.point.y, target.point.z))
-            goal = Pick.Goal()
-            goal.target = target
-            goal.item_class = req.item_class
-            result = self.call_action(self.pick_client, goal, 'pick')
-            if not result.success:
-                raise MissionFailed('PICK_FAILED', result.reason)
+            self.detect_and_pick(req.item_class)
 
             self.set_arm(SetArmPose.Request.POSE_CARRY)
             self.set_state(S.STATE_MOVING, '', '목적지 {}'.format(req.destination))
