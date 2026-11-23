@@ -1,6 +1,6 @@
 # 배송 작업 관리 노드 (rovpang_manager / task_manager) – 시험 결과와 연동 시 주의할 점
 
-작성: 정서인 (팀원 1) · 2026-11-19 작성, 2026-11-20 패키지 이름 변경(rovpang_mission → rovpang_manager), QR 2회 기회·예외 알림 추가
+작성: 정서인 (팀원 1) · 2026-11-19 작성, 2026-11-20 패키지 이름 변경(rovpang_mission → rovpang_manager), QR 2회 기회·예외 알림 추가 · 2026-11-23 집기 재시도
 
 ## 1. 무엇을 하는 패키지인가
 
@@ -20,6 +20,11 @@
 - 2번 모두 틀리면 하역하지 않는다. 팔을 **CARRY 자세로 바꿔 물품을 쥔 채** 출발지로 돌아간다. 하역 후 복귀할 때는 HOME 자세를 쓴다.
 - 복귀 전에 팔 자세를 바꾸지 못하면, 팔을 뻗은 채 주행하지 않도록 **멈추고** ARM_POSE_FAILED 알림을 낸다.
 - qr_timeout(30초)은 두 번의 기회를 합친 시간이다. NOT_REGISTERED는 프로그램 쪽 문제라 다시 시도하지 않는다.
+
+### 집기 재시도 (11/23 추가)
+- 집기 실패 시 1회 재시도는 **배송 작업 관리 노드(task_manager)에서만** 한다(pick_attempts=2, 첫 시도 + 재시도 1회).
+- pick이 실패하면 팔을 LOOK 자세로 바꾸고 물품을 **다시 탐지**해서, 새 위치로 pick을 다시 요청한다. 첫 시도 때 물품이 밀렸을 수 있기 때문이다.
+- 2번 모두 실패하면 PICK_FAILED (예: `mock: 그리퍼 파지 실패 (2/2회 실패)`)로 끝나고 짧은 비프음 3번이 울린다. 출발 전이라 복귀는 없다.
 
 ### 복귀 필요 상태와 수동 복귀 (11/20 추가)
 - 출발지로 돌아오지 못하고 멈추면 **복귀 필요** 상태가 된다. 원인은 복귀 전 팔 자세 실패(ARM_POSE_FAILED)나 복귀 주행 실패(RETURN_FAILED)다.
@@ -76,20 +81,22 @@ mock_robot 자리에 실제 노드가 들어갈 때 아래를 지켜야 지금 �
    이동 중 취소되면 배송 작업 관리 노드는 곧바로 go_to(START)를 다시 보낸다.
    실제 go_to 액션은 취소 요청을 받으면 Nav2 목표를 취소해 **로봇을 먼저 멈춘 뒤** canceled로 끝나야 한다.
    그렇지 않으면 이전 목적지와 출발지 이동이 겹칠 수 있다.
-2. **pick 목표 좌표계**
+2. **pick은 한 번만 시도 (11/23)**
+   재시도는 task_manager가 물품을 다시 찾아서 한다. pick 액션 안에서 다시 시도하면 시도 횟수가 최대 4번이 되므로, pick은 한 번 시도하고 실패하면 result.success=false와 reason(실패 이유)을 정확히 채워 돌려준다. result.attempts는 1로 둔다.
+3. **pick 목표 좌표계**
    Pick.Goal.target은 /rovpang/detections의 header.frame_id(카메라 좌표계) 그대로 보낸다.
    팔 좌표계 변환은 팀원 2가 TF로 처리한다. 실패 시 result.success=false와 reason을 채워야 오류가 기록된다.
-3. **place**
+4. **place**
    지금은 use_default=true(정해진 하역대 위치)만 쓴다.
-4. **set_arm_pose (HOME / CARRY / LOOK)**
+5. **set_arm_pose (HOME / CARRY / LOOK)**
    인증에 실패하면 VERIFYING의 LOOK 자세에서 **물품을 쥔 채** CARRY로 바꾸라는 요청이 온다. 물품을 쥔 상태에서도 LOOK → CARRY 전환이 되어야 한다.
    LOOK 자세에서 물품·표지판·QR이 카메라에 보여야 하고, 깊이 카메라 특성상 카메라–대상 거리를 25~30cm 이상 두어야 한다(약 20cm 이내는 깊이 없음).
-5. **액션 서버 구조**
+6. **액션 서버 구조**
    액션 콜백 안에서 spin_until_future_complete를 쓰면 멈출 수 있다.
    MultiThreadedExecutor + ReentrantCallbackGroup으로 만들고 서비스 결과는 future가 끝날 때까지 기다리는 방식이 안전하다(mock_robot.py 참고).
-6. **시간 제한**
+7. **시간 제한**
    배송 작업 관리 노드는 액션 서버를 5초 기다리고, 액션 결과는 최대 60초(action_timeout), 팔 자세 서비스는 15초 기다린다. 넘으면 TIMEOUT으로 실패 처리한다.
-7. **부저**
+8. **부저**
    task_manager는 ros_robot_controller 노드의 `/ros_robot_controller/set_buzzer`로 소리를 낸다(팔 서보와 같은 노드). 이 노드가 실행 중이어야 소리가 난다.
 
 ## 4. 집기·하역 결과 확인 방법 (11/20 팀장 확인)
@@ -112,6 +119,8 @@ ros2 service call /rovpang/cancel std_srvs/srv/Trigger     # 취소
 ```
 delay, wrong_qr_for 값은 10.0, 3.0처럼 소수점을 붙여야 한다.
 - `wrong_qr:=true`: QR 2번 모두 틀림 → FAILED / QR_INVALID, CARRY 자세로 복귀
+- `pick_fail_times:=1`: 첫 집기만 실패 → 물품을 다시 찾아 두 번째 집기 성공 → DONE
+- `fail_on:=pick`: 집기 2번 모두 실패 → FAILED / PICK_FAILED (2/2회 실패)
 - `wrong_qr_for:=3.0`: 첫 QR만 틀림 → 다시 보여 주세요 안내 후 두 번째에 성공 → DONE
 - `wrong_qr:=true fail_on:=arm_away`: QR 실패 → 배송지에서 CARRY 자세 실패 → 멈춤(복귀 필요). 이 상태에서 새 요청은 거절된다.
   `ros2 param set /mock_robot fail_on none`(고장 해결) → `ros2 service call /rovpang/return_home std_srvs/srv/Trigger` → 복귀 후 IDLE
