@@ -29,7 +29,7 @@ class ArmController(Node):
 
 		self.cur_pos = Pose()
 
-	def _publisher_positions(self, pulses, duration: float):
+	def _publish_positions(self, pulses, duration: float):
 		if len(pulses) < 5:
 			self.get_logger().error(f"Need 5 pulses, got {len(pulses)}")
 			return
