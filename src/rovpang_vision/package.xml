@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rovpang_vision</name>
+  <version>0.1.0</version>
+  <description>RovPang Vision AI (팀원 1): 물품 탐지(object_detector), 위치 계산(object_pose), QR 인식(qr_detector)</description>
+  <maintainer email="seoin@example.com">정서인</maintainer>
+  <license>Apache-2.0</license>
+
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>rovpang_interfaces</depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+  <!-- onnxruntime 은 pip 패키지 (로봇 docker에 1.17.1 설치되어 있음) -->
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

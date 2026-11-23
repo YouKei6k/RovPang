@@ -73,6 +73,17 @@ PC처럼 이 메시지가 없는 환경에서는 소리 없이 안내 문장만 
 
 wrong_qr_for:=1.0은 팔 LOOK 전환(약 0.5초)과 표지판 5장 수집(약 1초)이 끝나기 전에 틀린 QR이 끝나 두 번째 기회가 시험되지 않았다. 3.0 이상으로 시험한다.
 
+### 실제 QR 인증 시험 결과 (2026-11-23, 실제 카메라 + qr_detector, 로봇은 가짜 노드)
+
+실행: `mock_test.launch.py publish_qr:=false`(가짜 QR 끔) + `rovpang_vision qr_detector` + `send_request --token ...`, 시험용 QR은 `make_qr`로 만들어 화면에 띄움.
+
+| 시험 | 요청 토큰 / 보여 준 QR | 결과 |
+| --- | --- | --- |
+| 맞는 QR | rovpang-test-01 / test-01 | VERIFYING 후 1.8초 만에 PLACING → DONE |
+| 틀린 QR | rovpang-test-03 / test-02 | QR 불일치 1/2회 → 약 2초 뒤 2/2회 → FAILED / QR_INVALID, CARRY 자세로 복귀 성공 |
+| 재사용 QR | rovpang-test-01 / test-01 | QR 불일치 1/2회 → FAILED / QR_REUSED, CARRY 자세로 복귀 성공 |
+| 비프음 | 위 시험 중 | 짧게 1번(QR_RETRY), 짧게 2번(인증 실패) 확인. ros_robot_controller 가 켜져 있어야 소리가 남 (`ros2 launch controller controller.launch.py`) |
+
 ## 3. 팀원 2 기능과 연동할 때 주의할 점
 
 mock_robot 자리에 실제 노드가 들어갈 때 아래를 지켜야 지금 시험 결과가 그대로 유지된다.
@@ -121,6 +132,7 @@ delay, wrong_qr_for 값은 10.0, 3.0처럼 소수점을 붙여야 한다.
 - `wrong_qr:=true`: QR 2번 모두 틀림 → FAILED / QR_INVALID, CARRY 자세로 복귀
 - `pick_fail_times:=1`: 첫 집기만 실패 → 물품을 다시 찾아 두 번째 집기 성공 → DONE
 - `fail_on:=pick`: 집기 2번 모두 실패 → FAILED / PICK_FAILED (2/2회 실패)
+- `publish_qr:=false`: 가짜 QR을 보내지 않음 → 실제 qr_detector(카메라)로 인증. 요청은 `send_request --token 토큰`으로 QR과 같은 토큰 지정
 - `wrong_qr_for:=3.0`: 첫 QR만 틀림 → 다시 보여 주세요 안내 후 두 번째에 성공 → DONE
 - `wrong_qr:=true fail_on:=arm_away`: QR 실패 → 배송지에서 CARRY 자세 실패 → 멈춤(복귀 필요). 이 상태에서 새 요청은 거절된다.
   `ros2 param set /mock_robot fail_on none`(고장 해결) → `ros2 service call /rovpang/return_home std_srvs/srv/Trigger` → 복귀 후 IDLE

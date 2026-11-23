@@ -6,6 +6,7 @@
 수령자가 올바른 QR을 보여주는 것처럼 /rovpang/qr 을 5Hz로 발행한다.
   wrong_sign: true 면 다른 배송지 표지판을 보냄
   wrong_qr:   true 면 틀린 QR 문자열을 보냄
+  publish_qr: false 면 QR을 보내지 않음 (실제 qr_detector 로 QR 인증을 시험할 때)
   wrong_qr_for: 0보다 크면 인증 단계(VERIFYING) 시작 후 이 시간(초) 동안만 틀린 QR을 보내고
                 그다음 올바른 QR을 보냄 (QR 두 번째 기회 성공 시험용)
 """
@@ -22,6 +23,7 @@ class MockVision(Node):
         self.declare_parameter('wrong_sign', False)
         self.declare_parameter('wrong_qr', False)
         self.declare_parameter('wrong_qr_for', 0.0)
+        self.declare_parameter('publish_qr', True)
         self.declare_parameter('frame_id', 'depth_cam_color_frame')
         self.req = None
         self.verify_start = None   # 인증 단계가 시작된 시각
@@ -79,6 +81,8 @@ class MockVision(Node):
         sign.confidence = 0.9
         self.sign_pub.publish(sign)
 
+        if not self.get_parameter('publish_qr').value:
+            return
         qr = String()
         qr.data = 'WRONG-TOKEN' if self.qr_is_wrong() else self.req.qr_token
         self.qr_pub.publish(qr)

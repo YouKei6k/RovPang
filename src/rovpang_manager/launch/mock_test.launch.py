@@ -6,6 +6,7 @@
   ros2 launch rovpang_manager mock_test.launch.py wrong_sign:=true
   ros2 launch rovpang_manager mock_test.launch.py wrong_qr:=true          # QR 2번 모두 틀림 -> CARRY 복귀
   ros2 launch rovpang_manager mock_test.launch.py wrong_qr_for:=3.0      # 첫 QR만 틀림 -> 두 번째에 성공
+  ros2 launch rovpang_manager mock_test.launch.py publish_qr:=false   # QR은 실제 qr_detector(카메라)로
   ros2 launch rovpang_manager mock_test.launch.py delay:=10.0   # 취소 시험용으로 동작을 느리게
   ros2 launch rovpang_manager mock_test.launch.py wrong_qr:=true fail_on:=arm_away   # 복귀 전 멈춤 -> return_home 시험
 """
@@ -20,6 +21,7 @@ def generate_launch_description():
     wrong_sign = LaunchConfiguration('wrong_sign')
     wrong_qr = LaunchConfiguration('wrong_qr')
     wrong_qr_for = LaunchConfiguration('wrong_qr_for')
+    publish_qr = LaunchConfiguration('publish_qr')
     delay = LaunchConfiguration('delay')
     pick_fail_times = LaunchConfiguration('pick_fail_times')
     return LaunchDescription([
@@ -27,6 +29,8 @@ def generate_launch_description():
                               description='pick / place / go_to / arm / arm_away 중 하나를 실패시키기'),
         DeclareLaunchArgument('wrong_sign', default_value='false'),
         DeclareLaunchArgument('wrong_qr', default_value='false'),
+        DeclareLaunchArgument('publish_qr', default_value='true',
+                              description='false 면 가짜 QR을 보내지 않음 (실제 qr_detector 사용)'),
         DeclareLaunchArgument('wrong_qr_for', default_value='0.0',
                               description='인증 시작 후 몇 초 동안 틀린 QR을 보낼지 (3.0처럼 소수점, 팔 LOOK·표지판 확인 시간보다 길게)'),
         DeclareLaunchArgument('delay', default_value='2.0', description='가짜 로봇 동작 시간(초)'),
@@ -36,7 +40,8 @@ def generate_launch_description():
                                       'pick_fail_times': pick_fail_times}]),
         Node(package='rovpang_manager', executable='mock_vision', name='mock_vision',
              output='screen', parameters=[{'wrong_sign': wrong_sign, 'wrong_qr': wrong_qr,
-                                                'wrong_qr_for': wrong_qr_for}]),
+                                                'wrong_qr_for': wrong_qr_for,
+                                                'publish_qr': publish_qr}]),
         Node(package='rovpang_manager', executable='task_manager', name='task_manager',
              output='screen'),
     ])
