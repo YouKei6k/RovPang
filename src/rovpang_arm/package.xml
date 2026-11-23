@@ -9,6 +9,10 @@
 
   <depend>rclpy</depend>
   <depend>kinematics_msgs</depend>
+  <depend>rovpang_interfaces</depend>
+
+  <exec_depend>servo_controller_msgs</exec_depend>
+  <exec_depend>ros_robot_controller_msgs</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
