@@ -19,6 +19,8 @@ setup(
     entry_points={
         'console_scripts': [
             'object_detector = rovpang_vision.object_detector:main',
+            'qr_detector = rovpang_vision.qr_detector:main',
+            'make_qr = rovpang_vision.make_qr:main',
         ],
     },
 )

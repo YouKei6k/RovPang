@@ -5,6 +5,9 @@ Vision AI: 물품 탐지(F-02), 위치 계산(F-03, 예정), 배송지 표지판
 | 파일 | 역할 |
 | --- | --- |
 | object_detector | 카메라 컬러 영상을 YOLO(ONNX)로 탐지해 /rovpang/detections 발행 (3차원 위치는 아직 없음) |
+| qr_detector | 카메라 영상에서 QR을 읽어 /rovpang/qr (std_msgs/String) 발행. 인증 판단은 task_manager(recipient_auth) |
+| make_qr | 시험용 QR 그림 만들기 (`--text 토큰`) |
+| (모듈) qr_tools | QR 읽기(기본 검출기 → 못 읽으면 ArUco 기반 검출기), QR 그림 만들기 |
 | (모듈) yolo_onnx | YOLOv8 ONNX 탐지기. onnxruntime CPU로 실행 (ultralytics·GPU 불필요) |
 | (모듈) image_utils | ROS 영상 <-> OpenCV 변환 (cv_bridge 없이) |
 
@@ -26,3 +29,12 @@ ros2 topic echo /rovpang/detections                                         # �
 - 처리 시간 290~440 ms/장, 10초에 22~26장 (카메라 드라이버와 CPU를 나눠 써서 사진 시험 132 ms보다 느림)
 - 오탐: 모니터를 화면 대부분 크기 (0,0)-(518,359), 신뢰도 0.55~0.60 의 buds 로 잡음
   -> max_box_ratio 로 영상 넓이 25% 넘는 상자 제거. 근본 해결은 모니터가 보이는 배경 사진을 넣어 다시 학습
+
+## QR 인식 시험
+```bash
+ros2 run rovpang_vision make_qr --text rovpang-test-01        # qr_rovpang-test-01.png 생성 → PC로 가져와 휴대폰·인쇄
+ros2 run rovpang_vision qr_detector                           # 창 2
+ros2 topic echo /rovpang/qr                                   # 창 3
+```
+QR 크기: 영상(640x360)에서 QR이 약 100픽셀 이상이어야 읽힌다(ROS 없는 시험 기준).
+카메라 가로 화각을 약 80도로 잡으면 40cm 거리에서 화면 가로가 약 65cm이므로, QR은 약 10cm 이상이거나 더 가까이 보여야 한다.
