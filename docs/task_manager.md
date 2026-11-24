@@ -84,6 +84,16 @@ wrong_qr_for:=1.0은 팔 LOOK 전환(약 0.5초)과 표지판 5장 수집(약 1�
 | 재사용 QR | rovpang-test-01 / test-01 | QR 불일치 1/2회 → FAILED / QR_REUSED, CARRY 자세로 복귀 성공 |
 | 비프음 | 위 시험 중 | 짧게 1번(QR_RETRY), 짧게 2번(인증 실패) 확인. ros_robot_controller 가 켜져 있어야 소리가 남 (`ros2 launch controller controller.launch.py`) |
 
+### 실제 카메라 탐지·위치·QR로 배송 시험 (2026-11-24, 로봇 동작·표지판만 가짜)
+
+실행: 카메라(`depth_registration:=true`) + `rovpang_vision object_detector`(위치 포함) + `qr_detector` + `mock_test.launch.py publish_detections:=false publish_qr:=false` + `send_request --item buds --token rovpang-test-01`
+
+| 단계 | 결과 |
+| --- | --- |
+| 물품 탐지·위치 | 버즈 약 32cm: 신뢰도 1.00, 위치 (X 0.011, Y 0.040, Z 0.324) m, 크기 약 4.7x5.1cm |
+| PICKING | `[pick] buds at (0.01, 0.04, 0.33) frame=depth_cam_color_optical_frame` (실제 카메라 좌표계 이름으로 전달) |
+| QR 인증 | test-02 → QR_INVALID 후 CARRY 복귀 / test-01 → PLACING → DONE (요청부터 약 13.8초) |
+
 ## 3. 팀원 2 기능과 연동할 때 주의할 점
 
 mock_robot 자리에 실제 노드가 들어갈 때 아래를 지켜야 지금 시험 결과가 그대로 유지된다.
@@ -101,7 +111,7 @@ mock_robot 자리에 실제 노드가 들어갈 때 아래를 지켜야 지금 �
    지금은 use_default=true(정해진 하역대 위치)만 쓴다.
 5. **set_arm_pose (HOME / CARRY / LOOK)**
    인증에 실패하면 VERIFYING의 LOOK 자세에서 **물품을 쥔 채** CARRY로 바꾸라는 요청이 온다. 물품을 쥔 상태에서도 LOOK → CARRY 전환이 되어야 한다.
-   LOOK 자세에서 물품·표지판·QR이 카메라에 보여야 하고, 깊이 카메라 특성상 카메라–대상 거리를 25~30cm 이상 두어야 한다(약 20cm 이내는 깊이 없음).
+   LOOK 자세에서 물품·표지판·QR이 카메라에 보여야 하고, 카메라–물품 거리는 25~40cm로 둔다(약 20cm 이내는 깊이 없음, 50cm부터 탐지 신뢰도 0.5~0.87로 떨어지고 70cm는 탐지 안 됨, 11/24 측정).
 6. **액션 서버 구조**
    액션 콜백 안에서 spin_until_future_complete를 쓰면 멈출 수 있다.
    MultiThreadedExecutor + ReentrantCallbackGroup으로 만들고 서비스 결과는 future가 끝날 때까지 기다리는 방식이 안전하다(mock_robot.py 참고).
@@ -132,6 +142,7 @@ delay, wrong_qr_for 값은 10.0, 3.0처럼 소수점을 붙여야 한다.
 - `wrong_qr:=true`: QR 2번 모두 틀림 → FAILED / QR_INVALID, CARRY 자세로 복귀
 - `pick_fail_times:=1`: 첫 집기만 실패 → 물품을 다시 찾아 두 번째 집기 성공 → DONE
 - `fail_on:=pick`: 집기 2번 모두 실패 → FAILED / PICK_FAILED (2/2회 실패)
+- `publish_detections:=false`: 가짜 물품 탐지를 보내지 않음 → 실제 object_detector(카메라, 위치 포함). 물품 이름은 `--item buds`
 - `publish_qr:=false`: 가짜 QR을 보내지 않음 → 실제 qr_detector(카메라)로 인증. 요청은 `send_request --token 토큰`으로 QR과 같은 토큰 지정
 - `wrong_qr_for:=3.0`: 첫 QR만 틀림 → 다시 보여 주세요 안내 후 두 번째에 성공 → DONE
 - `wrong_qr:=true fail_on:=arm_away`: QR 실패 → 배송지에서 CARRY 자세 실패 → 멈춤(복귀 필요). 이 상태에서 새 요청은 거절된다.

@@ -25,5 +25,6 @@ ros2 service call /rovpang/cancel std_srvs/srv/Trigger     # 취소 시험
 집기는 실패하면 물품을 다시 찾아 1회 재시도(pick_attempts=2, pick 액션은 한 번만 시도). QR은 2번 기회(qr_attempts), 모두 틀리면 CARRY 자세로 물품을 가지고 복귀. 예외 시 `/rovpang/alert` 발행과 부저 비프음(use_buzzer, 음성 없음).
 
 복귀하지 못하고 멈추면 '복귀 필요' 상태가 되어 새 요청을 거절한다. 원인 해결 후 `ros2 service call /rovpang/return_home std_srvs/srv/Trigger`.
+실제 카메라 전체 시험: `publish_detections:=false publish_qr:=false` + `rovpang_vision object_detector` + `qr_detector` + `send_request --item buds --token ...`.
 실제 QR 시험: `publish_qr:=false` + `ros2 run rovpang_vision qr_detector` + `send_request --token rovpang-test-01` (QR은 `ros2 run rovpang_vision make_qr --text rovpang-test-01`).
 시험: `wrong_qr:=true fail_on:=arm_away` → `ros2 param set /mock_robot fail_on none` → return_home 호출.
