@@ -23,9 +23,10 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from sensor_msgs.msg import CameraInfo, Image
 
-from rovpang_interfaces.msg import Detection, DetectionArray
+from rovpang_interfaces.msg import DeliveryStatus, Detection, DetectionArray
 from rovpang_vision.image_utils import from_bgr, to_bgr
 from rovpang_vision.object_pose import depth_to_meters, locate
+from rovpang_vision.state_gate import StateGate
 from rovpang_vision.yolo_onnx import YoloOnnx
 
 DEFAULT_MODEL = '/home/ubuntu/share/tmp/rovpang_models/best_320.onnx'
@@ -95,6 +96,13 @@ class ObjectDetector(Node):
         self.total_ms = 0.0
         self.create_timer(10.0, self.report)
         self.warned_encoding = False
+
+        # 필요한 배송 단계에서만 처리 (CPU 아끼기, state_gate.py)
+        self.declare_parameter('gate_by_status', True)
+        self.declare_parameter('active_states', ['DETECTING', 'PICKING', 'PLACING'])
+        self.gate = StateGate(self.get_parameter('active_states').value,
+                              self.get_parameter('gate_by_status').value)
+        self.create_subscription(DeliveryStatus, '/rovpang/status', lambda m: self.gate.update(m.state), 10)
 
         self.latest_depth = None
         self.latest_recv = 0.0
@@ -183,7 +191,7 @@ class ObjectDetector(Node):
 
     def tick(self):
         msg = self.latest
-        if msg is None or msg.header.stamp == self.processed_stamp:
+        if msg is None or msg.header.stamp == self.processed_stamp or not self.gate.active():
             return
         self.processed_stamp = msg.header.stamp
         try:
@@ -233,7 +241,9 @@ class ObjectDetector(Node):
             self.img_pub.publish(out)
 
     def report(self):
-        if self.count:
+        if not self.count and not self.gate.active():
+            self.get_logger().info('쉬는 중 (배송 상태 {}, 처리 단계 아님)'.format(self.gate.state))
+        elif self.count:
             self.get_logger().info('최근 10초: {}장 처리, 평균 {:.0f} ms/장'.format(
                 self.count, self.total_ms / self.count))
         else:

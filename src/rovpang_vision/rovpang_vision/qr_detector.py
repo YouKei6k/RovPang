@@ -16,8 +16,11 @@ from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
 
+from rovpang_interfaces.msg import DeliveryStatus
+
 from rovpang_vision.image_utils import to_bgr
 from rovpang_vision.qr_tools import QrReader
+from rovpang_vision.state_gate import StateGate
 
 
 class QrDetector(Node):
@@ -26,6 +29,12 @@ class QrDetector(Node):
         self.declare_parameter('image_topic', '/depth_cam/rgb/image_raw')
         self.declare_parameter('rate', 5.0)       # 초당 확인 횟수
         self.reader = QrReader()
+        # 필요한 배송 단계에서만 처리 (CPU 아끼기, state_gate.py)
+        self.declare_parameter('gate_by_status', True)
+        self.declare_parameter('active_states', ['VERIFYING'])
+        self.gate = StateGate(self.get_parameter('active_states').value,
+                              self.get_parameter('gate_by_status').value)
+        self.create_subscription(DeliveryStatus, '/rovpang/status', lambda m: self.gate.update(m.state), 10)
         self.latest = None
         self.processed_stamp = None
         self.last_text = None
@@ -44,7 +53,7 @@ class QrDetector(Node):
 
     def tick(self):
         msg = self.latest
-        if msg is None or msg.header.stamp == self.processed_stamp:
+        if msg is None or msg.header.stamp == self.processed_stamp or not self.gate.active():
             return
         self.processed_stamp = msg.header.stamp
         try:
@@ -64,7 +73,9 @@ class QrDetector(Node):
                 self.last_text = text
 
     def report(self):
-        if self.count:
+        if not self.count and not self.gate.active():
+            self.get_logger().info('쉬는 중 (배송 상태 {}, 처리 단계 아님)'.format(self.gate.state))
+        elif self.count:
             self.get_logger().info('최근 10초: {}장 확인, QR {}번 읽음, 평균 {:.0f} ms/장'.format(
                 self.count, self.found, self.total_ms / self.count))
         else:

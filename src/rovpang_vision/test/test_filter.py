@@ -14,6 +14,7 @@ sys.modules['sensor_msgs.msg'].Image = object
 sys.modules['sensor_msgs.msg'].CameraInfo = object
 sys.modules['rovpang_interfaces.msg'].Detection = object
 sys.modules['rovpang_interfaces.msg'].DetectionArray = object
+sys.modules['rovpang_interfaces.msg'].DeliveryStatus = object
 
 from rovpang_vision.object_detector import filter_by_size, filter_large_boxes  # noqa: E402
 

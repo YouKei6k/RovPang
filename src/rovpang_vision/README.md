@@ -1,6 +1,6 @@
 # rovpang_vision (팀원 1)
 
-Vision AI: 물품 탐지(F-02), 위치 계산(F-03), QR 인식(F-10), 배송지 표지판 인식(F-09, 예정).
+Vision AI: 물품 탐지(F-02), 위치 계산(F-03), QR 인식(F-10), 배송지 표지판 인식(F-09).
 
 | 파일 | 역할 |
 | --- | --- |
@@ -8,6 +8,10 @@ Vision AI: 물품 탐지(F-02), 위치 계산(F-03), QR 인식(F-10), 배송지 
 | (모듈) object_pose | 상자 중심 주변 깊이 중앙값 + 카메라 보정값(핀홀) → 카메라 기준 X·Y·Z(m), 실제 크기 추정 |
 | qr_detector | 카메라 영상에서 QR을 읽어 /rovpang/qr (std_msgs/String) 발행. 인증 판단은 task_manager(recipient_auth) |
 | make_qr | 시험용 QR 그림 만들기 (`--text 토큰`) |
+| sign_detector | 컬러 영상에서 빨간 삼각형(A)·파란 원(B) 표지판을 찾아 /rovpang/sign 발행 (색+모양, 학습 없음) |
+| make_sign | 시험·인쇄용 표지판 그림 sign_A.png, sign_B.png |
+| (모듈) state_gate | /rovpang/status 를 보고 필요한 배송 단계에서만 처리 (CPU 절약). 탐지: DETECTING·PICKING·PLACING, 표지판·QR: VERIFYING. task_manager가 없으면 항상 처리 |
+| (모듈) sign_tools | HSV 색 영역 → 외곽선 → 삼각형/원 모양 점수 |
 | (모듈) qr_tools | QR 읽기(기본 검출기 → 못 읽으면 ArUco 기반 검출기), QR 그림 만들기 |
 | (모듈) yolo_onnx | YOLOv8 ONNX 탐지기. onnxruntime CPU로 실행 (ultralytics·GPU 불필요) |
 | (모듈) image_utils | ROS 영상 <-> OpenCV 변환 (cv_bridge 없이) |
@@ -18,6 +22,8 @@ Vision AI: 물품 탐지(F-02), 위치 계산(F-03), QR 인식(F-10), 배송지 
 - Jetson Nano CPU 측정(11/23): 320 → 132 ms/장(7.6 FPS), 640 → 483 ms/장(2.1 FPS, 모니터 오탐 0.57) → 320 사용
 
 ## 실행
+`ros2 launch rovpang_vision vision.launch.py` : object_detector + sign_detector + qr_detector 한 번에 (gate_by_status 기본 true)
+
 ```bash
 ros2 launch peripherals depth_camera.launch.py depth_registration:=true   # 창 1: 카메라
 ros2 run rovpang_vision object_detector                                     # 창 2

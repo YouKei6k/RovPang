@@ -76,6 +76,7 @@ class TaskManager(Node):
         self.declare_parameter('action_timeout', 60.0)
         self.declare_parameter('pick_attempts', 2)       # 집기 시도 횟수 (첫 시도 + 재시도 1회)
         self.declare_parameter('log_dir', os.path.expanduser('~/rovpang_logs'))
+        self.declare_parameter('status_period', 1.0)     # 현재 상태를 다시 알리는 주기(초), 0이면 끔
 
         cb = ReentrantCallbackGroup()
         self.status_pub = self.create_publisher(DeliveryStatus, '/rovpang/status', 10)
@@ -119,18 +120,35 @@ class TaskManager(Node):
             with open(self.log_path, 'w', newline='') as f:
                 csv.writer(f).writerow(['time', 'delivery_id', 'state', 'error_code', 'message'])
 
+        self.last_error = ''
+        self.last_message = ''
         self.set_state(S.STATE_IDLE, '', '대기 중')
+        period = self.get_parameter('status_period').value
+        if period > 0:
+            self.create_timer(period, self.publish_status_again, callback_group=cb)
         self.get_logger().info('배송 작업 관리 노드 시작 (로그: {})'.format(self.log_path))
 
     # ---------- 상태 발행·기록 ----------
-    def set_state(self, state, error_code='', message=''):
-        self.state = state
+    def make_status(self):
         msg = DeliveryStatus()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.delivery_id = self.request.delivery_id if self.request else ''
-        msg.state = state
-        msg.error_code = error_code
-        msg.message = message
+        msg.state = self.state
+        msg.error_code = self.last_error
+        msg.message = self.last_message
+        return msg
+
+    def publish_status_again(self):
+        """현재 상태를 주기적으로 다시 발행한다.
+        상태는 바뀔 때만 발행되므로, 늦게 켜진 노드(비전 노드 등)는 지금 상태를 모른다.
+        1초마다 다시 알려서 늦게 켜진 노드도 곧 상태를 알게 한다. (CSV에는 남기지 않음)"""
+        self.status_pub.publish(self.make_status())
+
+    def set_state(self, state, error_code='', message=''):
+        self.state = state
+        self.last_error = error_code
+        self.last_message = message
+        msg = self.make_status()
         self.status_pub.publish(msg)
         with open(self.log_path, 'a', newline='') as f:
             csv.writer(f).writerow([time.strftime('%Y-%m-%d %H:%M:%S'), msg.delivery_id,
