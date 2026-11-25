@@ -94,6 +94,9 @@ class MockVision(Node):
             dest = 'B' if dest == 'A' else 'A'
         sign.label = dest
         sign.confidence = 0.9
+        sign.offset_x, sign.angle = 0.0, 0.0      # 정면 가운데
+        sign.has_distance, sign.distance = True, 0.5
+        sign.position.z = 0.5
         self.sign_pub.publish(sign)
 
     def publish_fake_qr(self):
