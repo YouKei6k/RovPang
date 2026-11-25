@@ -7,6 +7,7 @@
   ros2 launch rovpang_manager mock_test.launch.py wrong_qr:=true          # QR 2번 모두 틀림 -> CARRY 복귀
   ros2 launch rovpang_manager mock_test.launch.py wrong_qr_for:=3.0      # 첫 QR만 틀림 -> 두 번째에 성공
   ros2 launch rovpang_manager mock_test.launch.py publish_qr:=false   # QR은 실제 qr_detector(카메라)로
+  ros2 launch rovpang_manager mock_test.launch.py publish_detections:=false publish_qr:=false   # 물품·QR 모두 실제 카메라
   ros2 launch rovpang_manager mock_test.launch.py delay:=10.0   # 취소 시험용으로 동작을 느리게
   ros2 launch rovpang_manager mock_test.launch.py wrong_qr:=true fail_on:=arm_away   # 복귀 전 멈춤 -> return_home 시험
 """
@@ -22,6 +23,7 @@ def generate_launch_description():
     wrong_qr = LaunchConfiguration('wrong_qr')
     wrong_qr_for = LaunchConfiguration('wrong_qr_for')
     publish_qr = LaunchConfiguration('publish_qr')
+    publish_detections = LaunchConfiguration('publish_detections')
     delay = LaunchConfiguration('delay')
     pick_fail_times = LaunchConfiguration('pick_fail_times')
     return LaunchDescription([
@@ -29,6 +31,8 @@ def generate_launch_description():
                               description='pick / place / go_to / arm / arm_away 중 하나를 실패시키기'),
         DeclareLaunchArgument('wrong_sign', default_value='false'),
         DeclareLaunchArgument('wrong_qr', default_value='false'),
+        DeclareLaunchArgument('publish_detections', default_value='true',
+                              description='false 면 가짜 물품 탐지를 보내지 않음 (실제 object_detector 사용)'),
         DeclareLaunchArgument('publish_qr', default_value='true',
                               description='false 면 가짜 QR을 보내지 않음 (실제 qr_detector 사용)'),
         DeclareLaunchArgument('wrong_qr_for', default_value='0.0',
@@ -41,7 +45,8 @@ def generate_launch_description():
         Node(package='rovpang_manager', executable='mock_vision', name='mock_vision',
              output='screen', parameters=[{'wrong_sign': wrong_sign, 'wrong_qr': wrong_qr,
                                                 'wrong_qr_for': wrong_qr_for,
-                                                'publish_qr': publish_qr}]),
+                                                'publish_qr': publish_qr,
+                                                'publish_detections': publish_detections}]),
         Node(package='rovpang_manager', executable='task_manager', name='task_manager',
              output='screen'),
     ])
