@@ -7,6 +7,8 @@ delay 초 뒤에 성공을 돌려준다. fail_on 파라미터로 특정 기능�
            / 'arm_away' (출발지가 아닌 곳에서만 팔 자세 실패 -> 복귀 전 멈춤 시험)
   실행 중에 ros2 param set /mock_robot fail_on none 으로 고장을 '고칠' 수 있다.
   pick_fail_times: 처음 N번의 pick만 실패 (1이면 첫 집기 실패 -> 재시도 성공 시험)
+  pick_fail_reason: pick 이 실패할 때 돌려줄 이유. OUT_OF_RANGE 로 두면 '팔 반경 밖' 시험 (재시도 안 함)
+  팔 자세는 SetArmPose 에 정의된 이름만 받는다. 모르는 이름이면 실패를 돌려준다.
 """
 import time
 
@@ -26,6 +28,10 @@ class MockRobot(Node):
         self.declare_parameter('delay', 2.0)
         self.declare_parameter('fail_on', '')
         self.declare_parameter('pick_fail_times', 0)
+        self.declare_parameter('pick_fail_reason', 'mock: 그리퍼 파지 실패')
+        # SetArmPose 의 POSE_* 상수에서 받을 수 있는 자세 이름을 모은다
+        self.known_poses = {getattr(SetArmPose.Request, n) for n in dir(SetArmPose.Request)
+                            if n.startswith('POSE_')}
         self.pick_count = 0
         self.location = GoTo.Goal.DEST_START   # 가짜 로봇의 현재 위치
         cb = ReentrantCallbackGroup()
@@ -67,7 +73,7 @@ class MockRobot(Node):
         result.attempts = 1
         self.pick_count += 1
         if self.should_fail('pick') or self.pick_count <= self.get_parameter('pick_fail_times').value:
-            result.success, result.reason = False, 'mock: 그리퍼 파지 실패'
+            result.success, result.reason = False, self.get_parameter('pick_fail_reason').value
             goal_handle.abort()
         else:
             result.success, result.reason = True, ''
@@ -112,7 +118,11 @@ class MockRobot(Node):
         self.get_logger().info('[set_arm_pose] {}'.format(request.pose))
         time.sleep(0.5)
         away = self.location != GoTo.Goal.DEST_START
-        if self.should_fail('arm') or (self.should_fail('arm_away') and away):
+        if request.pose not in self.known_poses:
+            self.get_logger().warn('모르는 팔 자세: {} (가능: {})'.format(
+                request.pose, ', '.join(sorted(self.known_poses))))
+            response.success, response.message = False, 'mock: 모르는 자세 {}'.format(request.pose)
+        elif self.should_fail('arm') or (self.should_fail('arm_away') and away):
             response.success, response.message = False, 'mock: 팔 자세 실패'
         else:
             response.success, response.message = True, 'ok'

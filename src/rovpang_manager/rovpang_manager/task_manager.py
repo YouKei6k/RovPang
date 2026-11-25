@@ -4,7 +4,8 @@
 배송 요청(/rovpang/delivery_request)을 받으면 아래 순서로 팀원 2의 액션·서비스를 호출한다.
 
   DETECTING : 팔 LOOK 자세 -> /rovpang/detections 에서 요청 물품 찾기
-  PICKING   : /rovpang/pick (실패하면 LOOK 자세로 물품을 다시 찾아 새 위치로 다시 요청, pick_attempts 번까지)
+  PICKING   : /rovpang/pick (실패하면 LOOK_DOWN 자세로 물품을 다시 찾아 새 위치로 다시 요청, pick_attempts 번까지.
+              단, 팔이 닿지 않는 위치(OUT_OF_RANGE)면 다시 찾아도 같으므로 재시도하지 않음)
   MOVING    : 팔 CARRY 자세 -> /rovpang/go_to (목적지)
   VERIFYING : 팔 LOOK 자세 -> /rovpang/sign 다수결로 목적지 확인 -> /rovpang/qr 토큰 확인(recipient_auth)
   PLACING   : /rovpang/place
@@ -52,6 +53,9 @@ except ImportError:
 
 S = DeliveryStatus
 
+# pick 결과 reason 이 이 말로 시작하면 '팔 작업 반경 밖' (Pick.action 의 상수, 없으면 같은 문자열)
+OUT_OF_RANGE = getattr(Pick.Result, 'REASON_OUT_OF_RANGE', 'OUT_OF_RANGE')
+
 
 class MissionFailed(Exception):
     def __init__(self, code, message=''):
@@ -75,6 +79,8 @@ class TaskManager(Node):
         self.declare_parameter('buzzer_freq', 2000)
         self.declare_parameter('action_timeout', 60.0)
         self.declare_parameter('pick_attempts', 2)       # 집기 시도 횟수 (첫 시도 + 재시도 1회)
+        self.declare_parameter('detect_pose', 'LOOK_DOWN')   # 물품을 찾을 때 팔 자세
+        self.declare_parameter('verify_pose', 'LOOK_FRONT')  # 표지판·QR을 볼 때 팔 자세
         self.declare_parameter('log_dir', os.path.expanduser('~/rovpang_logs'))
         self.declare_parameter('status_period', 1.0)     # 현재 상태를 다시 알리는 주기(초), 0이면 끔
 
@@ -349,7 +355,7 @@ class TaskManager(Node):
         attempts = max(1, int(self.get_parameter('pick_attempts').value))
         for n in range(1, attempts + 1):
             self.set_state(S.STATE_DETECTING, '', '물품 {} 탐색 ({}/{}회)'.format(item_class, n, attempts))
-            self.set_arm(SetArmPose.Request.POSE_LOOK)
+            self.set_arm(self.get_parameter('detect_pose').value)
             self.last_detections = None   # 자세를 바꾼 뒤 새로 들어온 탐지만 사용
             target, conf = self.detect_item(item_class)
 
@@ -361,6 +367,9 @@ class TaskManager(Node):
             result = self.call_action(self.pick_client, goal, 'pick')
             if result.success:
                 return
+            if result.reason.startswith(OUT_OF_RANGE):
+                # 팔이 닿지 않는 곳: 다시 찾아도 위치가 같으므로 재시도하지 않는다 (팀장님과 합의 11/25)
+                raise MissionFailed('OUT_OF_RANGE', '{} ({}/{}회)'.format(result.reason, n, attempts))
             if n >= attempts:
                 raise MissionFailed('PICK_FAILED', '{} ({}/{}회 실패)'.format(result.reason, n, attempts))
             self.get_logger().warn('집기 실패 {}/{}회: {} -> 물품을 다시 찾아 재시도'.format(
@@ -383,7 +392,7 @@ class TaskManager(Node):
                 raise MissionFailed('NAV_FAILED', result.reason)
 
             self.set_state(S.STATE_VERIFYING, '', '표지판·QR 확인')
-            self.set_arm(SetArmPose.Request.POSE_LOOK)
+            self.set_arm(self.get_parameter('verify_pose').value)
             self.verify_sign(req.destination)
             self.verify_qr(req.delivery_id)
 

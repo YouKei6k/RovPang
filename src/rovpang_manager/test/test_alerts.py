@@ -5,7 +5,7 @@ from rovpang_manager.alerts import ALERTS, PATTERNS, get_alert, make_text
 CODES = ['ITEM_NOT_FOUND', 'PICK_FAILED', 'NAV_FAILED', 'SIGN_NOT_FOUND', 'WRONG_DESTINATION',
          'QR_INVALID', 'QR_REUSED', 'QR_TIMEOUT', 'NOT_REGISTERED', 'PLACE_FAILED', 'RETURN_FAILED',
          'TIMEOUT', 'SERVER_UNAVAILABLE', 'GOAL_REJECTED', 'ARM_POSE_FAILED', 'INTERNAL_ERROR',
-         'QR_RETRY', 'NEED_RETURN']
+         'QR_RETRY', 'NEED_RETURN', 'OUT_OF_RANGE']
 
 
 def test_every_code_has_alert():
@@ -37,3 +37,8 @@ def test_text_has_code_and_extra():
 
 def test_unknown_code():
     assert get_alert('SOMETHING_NEW')[0] == 'system'
+
+
+def test_out_of_range_is_item_sound():
+    # 팔 반경 밖도 물품 처리 실패 -> 짧게 3번
+    assert get_alert('OUT_OF_RANGE')[0] == 'item'
