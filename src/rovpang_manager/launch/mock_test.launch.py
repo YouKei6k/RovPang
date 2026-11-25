@@ -3,6 +3,7 @@
   ros2 launch rovpang_manager mock_test.launch.py
   ros2 launch rovpang_manager mock_test.launch.py fail_on:=pick           # 집기 2번 모두 실패 -> PICK_FAILED
   ros2 launch rovpang_manager mock_test.launch.py pick_fail_times:=1     # 첫 집기만 실패 -> 다시 찾아 재시도 성공
+  ros2 launch rovpang_manager mock_test.launch.py pick_fail_times:=1 pick_fail_reason:=OUT_OF_RANGE   # 팔 반경 밖 -> 재시도 없이 OUT_OF_RANGE
   ros2 launch rovpang_manager mock_test.launch.py wrong_sign:=true
   ros2 launch rovpang_manager mock_test.launch.py wrong_qr:=true          # QR 2번 모두 틀림 -> CARRY 복귀
   ros2 launch rovpang_manager mock_test.launch.py wrong_qr_for:=3.0      # 첫 QR만 틀림 -> 두 번째에 성공
@@ -16,6 +17,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -28,6 +30,8 @@ def generate_launch_description():
     publish_sign = LaunchConfiguration('publish_sign')
     delay = LaunchConfiguration('delay')
     pick_fail_times = LaunchConfiguration('pick_fail_times')
+    # 'mock: ...' 처럼 콜론(:)이 들어간 글자는 launch가 YAML 사전으로 읽어 버리므로 문자열로 고정
+    pick_fail_reason = ParameterValue(LaunchConfiguration('pick_fail_reason'), value_type=str)
     return LaunchDescription([
         DeclareLaunchArgument('fail_on', default_value='',
                               description='pick / place / go_to / arm / arm_away 중 하나를 실패시키기'),
@@ -43,9 +47,12 @@ def generate_launch_description():
                               description='인증 시작 후 몇 초 동안 틀린 QR을 보낼지 (3.0처럼 소수점, 팔 LOOK·표지판 확인 시간보다 길게)'),
         DeclareLaunchArgument('delay', default_value='2.0', description='가짜 로봇 동작 시간(초)'),
         DeclareLaunchArgument('pick_fail_times', default_value='0', description='처음 몇 번의 pick을 실패시킬지'),
+        DeclareLaunchArgument('pick_fail_reason', default_value='mock: 그리퍼 파지 실패',
+                              description='pick 실패 이유 (OUT_OF_RANGE 면 재시도하지 않음)'),
         Node(package='rovpang_manager', executable='mock_robot', name='mock_robot',
              output='screen', parameters=[{'fail_on': fail_on, 'delay': delay,
-                                      'pick_fail_times': pick_fail_times}]),
+                                      'pick_fail_times': pick_fail_times,
+                                      'pick_fail_reason': pick_fail_reason}]),
         Node(package='rovpang_manager', executable='mock_vision', name='mock_vision',
              output='screen', parameters=[{'wrong_sign': wrong_sign, 'wrong_qr': wrong_qr,
                                                 'wrong_qr_for': wrong_qr_for,

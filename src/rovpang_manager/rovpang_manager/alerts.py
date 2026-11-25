@@ -30,6 +30,7 @@ ALERTS = {
     # 물품 처리 실패
     'ITEM_NOT_FOUND': ('item', '요청한 물품을 찾지 못했습니다'),
     'PICK_FAILED': ('item', '물품을 집지 못했습니다'),
+    'OUT_OF_RANGE': ('item', '물품이 로봇팔이 닿는 범위 밖에 있습니다'),
     'PLACE_FAILED': ('item', '물품을 내려놓지 못했습니다'),
     # 주행·시스템 오류
     'NAV_FAILED': ('system', '배송지로 이동하지 못했습니다'),

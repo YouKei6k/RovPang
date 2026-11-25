@@ -1,7 +1,10 @@
 # 팀원 2 제공 : /rovpang/set_arm_pose
 string POSE_HOME="HOME"
 string POSE_CARRY="CARRY"  # 물품을 든 채 주행하는 자세
-string POSE_LOOK="LOOK"    # 표지판·QR·물품을 보는 자세
+string POSE_LOOK="LOOK"    # 표지판·QR·물품을 보는 자세 (예전 이름, 호환용)
+string POSE_LOOK_DOWN="LOOK_DOWN"    # 바닥의 물품을 내려다보는 자세 (탐지·집기 전, F-02)
+string POSE_LOOK_FRONT="LOOK_FRONT"  # 앞의 표지판·QR을 보는 자세 (배송지 인증, F-09·F-10)
+string POSE_SAFE="SAFE"              # 팔을 몸 안쪽으로 접어 부딪히지 않게 하는 안전 자세
 
 string pose
 ---

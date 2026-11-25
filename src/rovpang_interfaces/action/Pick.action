@@ -4,8 +4,9 @@ geometry_msgs/PointStamped target   # 물품 위치. frame_id는 카메라 좌�
 string item_class
 ---
 # Result
+string REASON_OUT_OF_RANGE="OUT_OF_RANGE"   # 목표가 팔 작업 반경 밖: 다시 찾아도 소용없어 재시도하지 않음
 bool success
-string reason                       # 실패 사유, 성공 시 ""
+string reason                       # 실패 사유, 성공 시 "". 반경 밖이면 OUT_OF_RANGE 로 시작
 int32 attempts
 ---
 # Feedback

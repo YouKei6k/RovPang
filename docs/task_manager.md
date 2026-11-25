@@ -23,7 +23,8 @@
 
 ### 집기 재시도 (11/23 추가)
 - 집기 실패 시 1회 재시도는 **배송 작업 관리 노드(task_manager)에서만** 한다(pick_attempts=2, 첫 시도 + 재시도 1회).
-- pick이 실패하면 팔을 LOOK 자세로 바꾸고 물품을 **다시 탐지**해서, 새 위치로 pick을 다시 요청한다. 첫 시도 때 물품이 밀렸을 수 있기 때문이다.
+- pick이 실패하면 팔을 LOOK_DOWN 자세로 바꾸고 물품을 **다시 탐지**해서, 새 위치로 pick을 다시 요청한다. 첫 시도 때 물품이 밀렸을 수 있기 때문이다.
+- 단, pick 실패 이유(reason)가 `OUT_OF_RANGE`로 시작하면(목표가 팔 작업 반경 밖) 다시 찾아도 위치가 같으므로 **재시도하지 않고** FAILED / OUT_OF_RANGE로 끝낸다 (11/25 팀장 확인).
 - 2번 모두 실패하면 PICK_FAILED (예: `mock: 그리퍼 파지 실패 (2/2회 실패)`)로 끝나고 짧은 비프음 3번이 울린다. 출발 전이라 복귀는 없다.
 
 ### 복귀 필요 상태와 수동 복귀 (11/20 추가)
@@ -104,14 +105,25 @@ mock_robot 자리에 실제 노드가 들어갈 때 아래를 지켜야 지금 �
    그렇지 않으면 이전 목적지와 출발지 이동이 겹칠 수 있다.
 2. **pick은 한 번만 시도 (11/23)**
    재시도는 task_manager가 물품을 다시 찾아서 한다. pick 액션 안에서 다시 시도하면 시도 횟수가 최대 4번이 되므로, pick은 한 번 시도하고 실패하면 result.success=false와 reason(실패 이유)을 정확히 채워 돌려준다. result.attempts는 1로 둔다.
+   목표가 팔 작업 반경 밖이면 reason을 `Pick.Result.REASON_OUT_OF_RANGE`("OUT_OF_RANGE")로 시작하게 채운다. 예: `OUT_OF_RANGE: 거리 0.42m`. 이때 task_manager는 재시도하지 않는다 (11/25 팀장 확인).
 3. **pick 목표 좌표계**
    Pick.Goal.target은 /rovpang/detections의 header.frame_id(카메라 좌표계) 그대로 보낸다.
    팔 좌표계 변환은 팀원 2가 TF로 처리한다. 실패 시 result.success=false와 reason을 채워야 오류가 기록된다.
 4. **place**
    지금은 use_default=true(정해진 하역대 위치)만 쓴다.
-5. **set_arm_pose (HOME / CARRY / LOOK)**
-   인증에 실패하면 VERIFYING의 LOOK 자세에서 **물품을 쥔 채** CARRY로 바꾸라는 요청이 온다. 물품을 쥔 상태에서도 LOOK → CARRY 전환이 되어야 한다.
-   LOOK 자세에서 물품·표지판·QR이 카메라에 보여야 하고, 카메라–물품 거리는 25~40cm로 둔다(약 20cm 이내는 깊이 없음, 50cm부터 탐지 신뢰도 0.5~0.87로 떨어지고 70cm는 탐지 안 됨, 11/24 측정).
+5. **set_arm_pose (HOME / CARRY / LOOK_DOWN / LOOK_FRONT / SAFE, 11/25 팀장 확인)**
+   | 자세 | 상수 | task_manager가 쓰는 곳 |
+   |---|---|---|
+   | HOME | POSE_HOME | 하역 후 복귀, 복귀 실패 복구 |
+   | CARRY | POSE_CARRY | 집은 뒤 주행, 인증 실패 시 물품을 쥔 채 복귀 |
+   | LOOK_DOWN | POSE_LOOK_DOWN | 물품 탐지·재탐지 (파라미터 detect_pose) |
+   | LOOK_FRONT | POSE_LOOK_FRONT | 배송지 표지판·QR 인증 (파라미터 verify_pose) |
+   | SAFE | POSE_SAFE | 팔 제어(팀원 2)에서 필요할 때 사용. task_manager는 아직 요청하지 않음 |
+   | LOOK | POSE_LOOK | 예전 이름, 호환용으로만 남김 |
+
+   팔 노드가 아직 LOOK_DOWN·LOOK_FRONT를 지원하지 않으면 `ros2 param set /task_manager detect_pose LOOK`, `verify_pose LOOK`으로 예전 자세를 쓸 수 있다.
+   인증에 실패하면 VERIFYING의 LOOK_FRONT 자세에서 **물품을 쥔 채** CARRY로 바꾸라는 요청이 온다. 물품을 쥔 상태에서도 LOOK_FRONT → CARRY 전환이 되어야 한다.
+   LOOK_DOWN 자세에서는 물품이, LOOK_FRONT 자세에서는 표지판·QR이 카메라에 보여야 하고, 카메라–물품 거리는 물품·표지판·QR이 카메라에 보여야 하고, 카메라–물품 거리는 25~40cm로 둔다(약 20cm 이내는 깊이 없음, 50cm부터 탐지 신뢰도 0.5~0.87로 떨어지고 70cm는 탐지 안 됨, 11/24 측정).
 6. **액션 서버 구조**
    액션 콜백 안에서 spin_until_future_complete를 쓰면 멈출 수 있다.
    MultiThreadedExecutor + ReentrantCallbackGroup으로 만들고 서비스 결과는 future가 끝날 때까지 기다리는 방식이 안전하다(mock_robot.py 참고).
@@ -142,6 +154,8 @@ delay, wrong_qr_for 값은 10.0, 3.0처럼 소수점을 붙여야 한다.
 - `wrong_qr:=true`: QR 2번 모두 틀림 → FAILED / QR_INVALID, CARRY 자세로 복귀
 - `pick_fail_times:=1`: 첫 집기만 실패 → 물품을 다시 찾아 두 번째 집기 성공 → DONE
 - `fail_on:=pick`: 집기 2번 모두 실패 → FAILED / PICK_FAILED (2/2회 실패)
+- `pick_fail_times:=1 pick_fail_reason:=OUT_OF_RANGE`: 첫 집기가 팔 반경 밖 → 재시도 없이 FAILED / OUT_OF_RANGE (1/2회), 짧게 3번
+- 팔 자세: mock_robot 로그에 탐지 때 `[set_arm_pose] LOOK_DOWN`, 인증 때 `[set_arm_pose] LOOK_FRONT`가 찍힌다. SetArmPose에 없는 이름이면 mock_robot이 실패를 돌려준다.
 - `publish_detections:=false`: 가짜 물품 탐지를 보내지 않음 → 실제 object_detector(카메라, 위치 포함). 물품 이름은 `--item buds`
 - `publish_qr:=false`: 가짜 QR을 보내지 않음 → 실제 qr_detector(카메라)로 인증. 요청은 `send_request --token 토큰`으로 QR과 같은 토큰 지정
 - `wrong_qr_for:=3.0`: 첫 QR만 틀림 → 다시 보여 주세요 안내 후 두 번째에 성공 → DONE
