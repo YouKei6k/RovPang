@@ -30,12 +30,14 @@ class ArmController(Node):
 		self.cur_pos = Pose()
 
 	def _publish_positions(self, pulses, duration: float):
-		if len(pulses) < 5:
+		if len(pulses) != 5:
 			self.get_logger().error(f"Need 5 pulses, got {len(pulses)}")
 			return
 		pos_list = []
 		for i in range(5):
-			p = int(max(0, min(65535, pulses[i])))
+			p = int(pulses[i])
+                        if not 0 <= p <= 1000:
+                                raise ValueError(f"ID{i + 1} pulse {p} outside 0..1000")
 			sp = ServoPosition()
 			sp.id = i + 1
 			sp.position = p
@@ -43,6 +45,7 @@ class ArmController(Node):
 
 		msg = ServosPosition()
 		msg.duration = float(duration)
+                msg.position_unit = 'pulse'
 		msg.position = pos_list
 		self.arm_pose_pub.publish(msg)
 
@@ -100,7 +103,8 @@ class ArmController(Node):
 		p_open = int(open_pulse if open_pulse is not None else default_open)
 		p_close = int(close_pulse if close_pulse is not None else default_close)
 		p = p_open if toggle else p_close
-		p = int(max(0, min(1000, p)))
+		if not 0 <= p <= 1000:
+                        raise ValueError(f"Gripper pulse {p} outside 0..1000")
 
 		grip = ServoPosition()
 		grip.id = 10
@@ -108,7 +112,8 @@ class ArmController(Node):
 
 		msg = ServosPosition()
 		msg.duration = float(duration)
-		msg.position = [grip]
+		msg.position_unit = 'pulse'
+                msg.position = [grip]
 		self.arm_pose_pub.publish(msg)
 
 	def get_current_pose(self):
