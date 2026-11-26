@@ -9,6 +9,8 @@ delay 초 뒤에 성공을 돌려준다. fail_on 파라미터로 특정 기능�
   pick_fail_times: 처음 N번의 pick만 실패 (1이면 첫 집기 실패 -> 재시도 성공 시험)
   pick_fail_reason: pick 이 실패할 때 돌려줄 이유. OUT_OF_RANGE 로 두면 '팔 반경 밖' 시험 (재시도 안 함)
   팔 자세는 SetArmPose 에 정의된 이름만 받는다. 모르는 이름이면 실패를 돌려준다.
+  serve: 흉내 낼 기능 목록. 실제 노드가 있는 기능은 빼서 겹치지 않게 한다
+         예) ['pick', 'place', 'arm'] -> go_to 는 실제 goto_server 사용
 """
 import time
 
@@ -29,6 +31,7 @@ class MockRobot(Node):
         self.declare_parameter('fail_on', '')
         self.declare_parameter('pick_fail_times', 0)
         self.declare_parameter('pick_fail_reason', 'mock: 그리퍼 파지 실패')
+        self.declare_parameter('serve', ['pick', 'place', 'go_to', 'arm'])
         # SetArmPose 의 POSE_* 상수에서 받을 수 있는 자세 이름을 모은다
         self.known_poses = {getattr(SetArmPose.Request, n) for n in dir(SetArmPose.Request)
                             if n.startswith('POSE_')}
@@ -38,12 +41,17 @@ class MockRobot(Node):
         common = dict(callback_group=cb,
                       goal_callback=lambda g: GoalResponse.ACCEPT,
                       cancel_callback=lambda g: CancelResponse.ACCEPT)
-        ActionServer(self, Pick, '/rovpang/pick', self.exec_pick, **common)
-        ActionServer(self, Place, '/rovpang/place', self.exec_place, **common)
-        ActionServer(self, GoTo, '/rovpang/go_to', self.exec_goto, **common)
-        self.create_service(SetArmPose, '/rovpang/set_arm_pose', self.on_arm, callback_group=cb)
-        self.get_logger().info('가짜 로봇 준비 완료 (fail_on="{}")'.format(
-            self.get_parameter('fail_on').value))
+        serve = set(self.get_parameter('serve').value)
+        if 'pick' in serve:
+            ActionServer(self, Pick, '/rovpang/pick', self.exec_pick, **common)
+        if 'place' in serve:
+            ActionServer(self, Place, '/rovpang/place', self.exec_place, **common)
+        if 'go_to' in serve:
+            ActionServer(self, GoTo, '/rovpang/go_to', self.exec_goto, **common)
+        if 'arm' in serve:
+            self.create_service(SetArmPose, '/rovpang/set_arm_pose', self.on_arm, callback_group=cb)
+        self.get_logger().info('가짜 로봇 준비 완료 (흉내: {}, fail_on="{}")'.format(
+            ', '.join(sorted(serve)), self.get_parameter('fail_on').value))
 
     def should_fail(self, name):
         return self.get_parameter('fail_on').value == name

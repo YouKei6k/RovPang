@@ -8,7 +8,7 @@ Vision AI: 물품 탐지(F-02), 위치 계산(F-03), QR 인식(F-10), 배송지 
 | (모듈) object_pose | 상자 중심 주변 깊이 중앙값 + 카메라 보정값(핀홀) → 카메라 기준 X·Y·Z(m), 실제 크기 추정 |
 | qr_detector | 카메라 영상에서 QR을 읽어 /rovpang/qr (std_msgs/String) 발행. 인증 판단은 task_manager(recipient_auth) |
 | make_qr | 시험용 QR 그림 만들기 (`--text 토큰`) |
-| sign_detector | 컬러 영상에서 빨간 삼각형(A)·파란 원(B) 표지판을 찾아 /rovpang/sign 발행 (색+모양, 학습 없음) |
+| sign_detector | 컬러 영상에서 빨간 삼각형(A)·파란 원(B) 표지판을 찾아 /rovpang/sign 발행 (색+모양, 학습 없음). 표지판 위치(가운데에서 벗어난 정도·각도·거리)도 함께 보냄 |
 | make_sign | 시험·인쇄용 표지판 그림 sign_A.png, sign_B.png |
 | (모듈) state_gate | /rovpang/status 를 보고 필요한 배송 단계에서만 처리 (CPU 절약). 탐지: DETECTING·PICKING·PLACING, 표지판·QR: VERIFYING. task_manager가 없으면 항상 처리 |
 | (모듈) sign_tools | HSV 색 영역 → 외곽선 → 삼각형/원 모양 점수 |

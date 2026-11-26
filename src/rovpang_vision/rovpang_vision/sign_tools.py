@@ -76,6 +76,23 @@ def best_sign(bgr, min_area=400, min_score=0.75):
     return found[0][0], found[0][1]
 
 
+def sign_offset(box, width, K=None):
+    """표지판 상자 (x, y, w, h)가 화면 가운데에서 가로로 얼마나 벗어났는지.
+    반환: (offset_x, angle)
+      offset_x: -1 왼쪽 끝 ~ 0 가운데 ~ +1 오른쪽 끝 (화면 폭 기준)
+      angle   : 카메라 정면 기준 가로 각도(rad), +는 오른쪽. K=(fx, fy, cx, cy) 가 없으면 0
+    도착 후 정렬(팀원 2)에서 '표지판이 정면에 오도록 회전'할 때 쓴다."""
+    x, _, w, _ = box
+    u = x + w / 2.0
+    half = width / 2.0
+    offset = (u - half) / half
+    angle = 0.0
+    if K is not None:
+        fx, _, cx, _ = K
+        angle = float(np.arctan2(u - cx, fx))
+    return float(max(-1.0, min(1.0, offset))), angle
+
+
 def make_sign_image(label, size=600):
     """인쇄·화면 표시용 표지판 그림. A = 빨간 삼각형, B = 파란 원 (흰 배경, 아래에 글자)"""
     img = np.full((size, size, 3), 255, np.uint8)
